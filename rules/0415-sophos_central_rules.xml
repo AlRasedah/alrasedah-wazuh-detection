@@ -1,0 +1,92 @@
+<!--
+  -  Sophos Central rules (JSON / API events)
+  -  Replaces the stock on-prem Sophos syslog ruleset (decoded_as sophos / sophos-win),
+  -  which never matches Sophos Central events - those decode as 'json', not 'sophos'.
+  -  Reuses stock IDs 82100-82105 and 64270-64271, so the stock file must be excluded:
+  -    <ruleset>
+  -      <rule_exclude>0415-sophos_rules.xml</rule_exclude>
+  -    </ruleset>
+  -
+  -  Deploy to: /var/ossec/etc/rules/0415-sophos_central_rules.xml
+-->
+
+<group name="sophos,central,">
+
+  <!-- Base: any Sophos Central JSON event. Fires nothing on its own; exists to chain from.
+       Update events land here and stop (level 0 = logged, not alerted). -->
+  <rule id="82100" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="type" type="pcre2">^Event::</field>
+    <description>Sophos Central event received.</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Floor: promote every NON-update Central event to a real (low) alert.
+       Update types (UpdateRebootRequired / UpdateSuccess) are excluded here via negate,
+       so they never escalate past the level-0 base above. -->
+  <rule id="82101" level="4">
+    <if_sid>82100</if_sid>
+    <field name="type" type="pcre2" negate="yes">^Event::Endpoint::Update</field>
+    <description>Sophos Central: $(type) on $(dhost) - User: $(suser)</description>
+  </rule>
+
+  <!-- Data Loss Prevention - file transfer allowed or blocked -->
+  <rule id="82102" level="6">
+    <if_sid>82101</if_sid>
+    <field name="type" type="pcre2">DataLossPrevention</field>
+    <description>Sophos Central DLP: $(name) on $(dhost) - User: $(suser)</description>
+    <mitre>
+      <id>T1567</id>
+    </mitre>
+  </rule>
+
+  <!-- Application Control - controlled / unwanted application blocked -->
+  <rule id="82103" level="7">
+    <if_sid>82101</if_sid>
+    <field name="type" type="pcre2">Event::Endpoint::Application::Blocked</field>
+    <description>Sophos Central: application blocked on $(dhost) - User: $(suser)</description>
+    <mitre>
+      <id>T1219</id>
+    </mitre>
+  </rule>
+
+  <!-- Central management state change (paused / resumed) - possible protection tampering -->
+  <rule id="82104" level="7">
+    <if_sid>82101</if_sid>
+    <field name="type" type="pcre2">Event::Endpoint::Management::</field>
+    <description>Sophos Central: management state changed ($(name)) on $(dhost) - User: $(suser)</description>
+    <mitre>
+      <id>T1562.001</id>
+    </mitre>
+  </rule>
+
+  <!-- ===== Malware / threat detections ===== -->
+
+  <!-- Threat family: malware, ML/PE-A, C2/runtime detections. type starts Event::Endpoint::Threat:: -->
+  <rule id="82105" level="10">
+    <if_sid>82101</if_sid>
+    <field name="type" type="pcre2">^Event::Endpoint::Threat::</field>
+    <description>Sophos Central: malware/threat detected - $(name) on $(dhost) - User: $(suser)</description>
+    <mitre>
+      <id>T1204.002</id>
+    </mitre>
+  </rule>
+
+  <!-- Escalation: threat could NOT be auto-remediated - manual action required -->
+  <rule id="64270" level="12">
+    <if_sid>82105</if_sid>
+    <field name="type" type="pcre2">Event::Endpoint::Threat::CleanupFailed</field>
+    <description>Sophos Central: malware cleanup FAILED - manual action required - $(name) on $(dhost)</description>
+  </rule>
+
+  <!-- CryptoGuard (ransomware) / exploit prevention. type starts Event::Endpoint::Hmpa -->
+  <rule id="64271" level="12">
+    <if_sid>82101</if_sid>
+    <field name="type" type="pcre2">^Event::Endpoint::Hmpa</field>
+    <description>Sophos Central: CryptoGuard/exploit prevention triggered ($(type)) on $(dhost) - User: $(suser)</description>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+  </rule>
+
+</group>

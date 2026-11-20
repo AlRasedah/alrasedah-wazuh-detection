@@ -1,0 +1,308 @@
+<!--
+  -  SonicWall decoders. FULL REPLACEMENT for the upstream plugin decoder.
+  -  Deploy: /var/ossec/etc/decoders/  wazuh:wazuh  660
+  -
+  -  Requires in ossec.conf:
+  -    <ruleset>
+  -      <decoder_exclude>ruleset/decoders/0295-sonicwall_decoders.xml</decoder_exclude>
+  -    </ruleset>
+  -
+  -  The upstream parent hands parsing to the compiled SonicWall_Decoder, which
+  -  is terminal: no child of that parent is ever evaluated, including
+  -  upstream's own sonicwall-fields blocks. Adding children cannot work.
+  -
+  -  Section 1 reproduces the seven static fields the plugin emitted, so rules
+  -  4800 to 4899 keep firing. status comes from pri and is what 4801 keys on.
+  -
+  -  Sample logs:
+  -    id=firewall sn=0040AABBCC01 time="2026-08-04 10:43:44" fw=192.0.2.1 pri=1 c=0 m=1099 msg="DNS rebind attack blocked" app=2 n=65806 src=8.8.8.8:53:X3:dns.google dst=10.0.10.25:54137:X6-V101 srcMac=00:00:5e:00:53:01 dstMac=00:00:5e:00:53:02 proto=udp/dns rule="42 (LAN[- -]\x3e WAN)"
+  -    id=firewall sn=0040AABBCC01 time="2026-07-26 01:49:21" fw=192.0.2.1 pri=1 c=32 m=82 msg="Possible port scan detected" n=7997 usr="Unknown (external)" src=203.0.113.50:43073:X2 dst=198.51.100.20:2087:X3 proto=tcp/2087 note="TCP scanned port list, 80, 2083"
+  -    id=NSA3500BR sn=0040AABBCC02 time="2019-03-14 16:37:19 UTC" fw=192.0.2.2 pri=1 c=32 m=1388 msg="IPSec VPN Decryption Failed" n=1064050271 src=203.0.113.60 dst=10.0.20.2 note="Replay check failure."
+  -    id=NSA3600  sn=0040AABBCC03 time="2019-02-27 12:55:40 UTC" fw=192.0.2.3 pri=5 c=0 m=1197 msg="NAT Mapping" n=4748427 src=10.0.30.9::X0-V500 dst=198.51.100.40::X3 proto=icmp rule="17 (LAN[- -]\x3e WAN)"
+  -    id=NSA2650GG sn=0040AABBCC04 time="2019-03-19 06:44:01 UTC" fw=192.0.2.4 pri=3 c=4 m=14 msg="Web site access denied" app=49177 appName="General HTTPS" n=856789 src=10.0.40.46:59668:X0:nb020.example.com dst=198.51.100.50:443:X1:example.com proto=tcp/https dstname=example.com arg=/ code=49 Category="Freeware/Software Downloads"
+  -    id=firewall sn=0040AABBCC03 time="2019-02-15 09:45:17 UTC" fw=192.0.2.3 pri=5 c=512 m=1233 msg="Unhandled link-local or multicast IPv6 packet dropped" n=56642 srcV6=fe80::9851:b780:9d9d:a29e src=:49702:X0-V514 dstV6=ff02::1:3 dst=:5355 proto=udp/5355
+-->
+
+<!-- \x3c and \x3e are the syslog priority brackets. ^\s* because events arrive
+     with a variable number of leading spaces. -->
+<decoder name="sonicwall">
+  <prematch type="pcre2">^\s*(?:\x3c\d+\x3e\s*)?id=\S+\s+sn=\w+\s+time="[^"]+"\s+fw=\S+\s</prematch>
+</decoder>
+
+<!-- 1. Static fields formerly produced by SonicWall_Decoder -->
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\spri=(\d+)</regex>
+  <order>status</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\smsg="([^"]+)"</regex>
+  <order>action</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\ssrc=(\d+\.\d+\.\d+\.\d+)</regex>
+  <order>srcip</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\ssrc=\d+\.\d+\.\d+\.\d+:(\d+)</regex>
+  <order>srcport</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sdst=(\d+\.\d+\.\d+\.\d+)</regex>
+  <order>dstip</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sdst=\d+\.\d+\.\d+\.\d+:(\d+)</regex>
+  <order>dstport</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sproto=(\S+)</regex>
+  <order>protocol</order>
+</decoder>
+
+<!-- 2. Interface and hostname, the segments the plugin discarded -->
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\ssrc=[^:\s]*:\d*:([^:\s]+):([^:\s]+)</regex>
+  <order>sonicwall.src_iface, sonicwall.src_host</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\ssrc=[^:\s]*:\d*:([^:\s]+)(?=\s|$)</regex>
+  <order>sonicwall.src_iface</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sdst=[^:\s]*:\d*:([^:\s]+):([^:\s]+)</regex>
+  <order>sonicwall.dst_iface, sonicwall.dst_host</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sdst=[^:\s]*:\d*:([^:\s]+)(?=\s|$)</regex>
+  <order>sonicwall.dst_iface</order>
+</decoder>
+
+<!-- 3. Zone transition -->
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\srule="(\d+)\s+\(([^)]+)\)"</regex>
+  <order>sonicwall.policy_id, sonicwall.zone_path</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\srule="\d+\s+\(([^)]+?)\x2d\x3e([^)]+)\)"</regex>
+  <order>sonicwall.src_zone, sonicwall.dst_zone</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\srule=(\d+)(?=\s|$)</regex>
+  <order>sonicwall.policy_id</order>
+</decoder>
+
+<!-- 4. Transport/service split so the service is matchable alone -->
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sproto=([^/\s]+)/(\S+)</regex>
+  <order>sonicwall.transport, sonicwall.service</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sproto=([^/\s]+)(?=\s|$)</regex>
+  <order>sonicwall.service</order>
+</decoder>
+
+<!-- 5. Device and event context. Leading \s keeps m= off msg=, n= off sn=. -->
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sm=(\d+)</regex>
+  <order>sonicwall.msg_id</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sid=(\S+)</regex>
+  <order>sonicwall.device_id</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\ssn=(\w+)</regex>
+  <order>sonicwall.serial</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sfw=(\S+)</regex>
+  <order>sonicwall.fw_ip</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sc=(\d+)</regex>
+  <order>sonicwall.category</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sn=(\d+)</regex>
+  <order>sonicwall.event_count</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sapp=(\d+)</regex>
+  <order>sonicwall.app_id</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\stime="([^"]+)"</regex>
+  <order>sonicwall.device_time</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\ssrcMac=([0-9a-fA-F:]+)</regex>
+  <order>sonicwall.src_mac</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sdstMac=([0-9a-fA-F:]+)</regex>
+  <order>sonicwall.dst_mac</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\susr="([^"]*)"</regex>
+  <order>sonicwall.user</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\snote="([^"]*)"</regex>
+  <order>sonicwall.note</order>
+</decoder>
+
+<!-- 6. IPv6 rides separate keys; src= and dst= are left empty on those -->
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\ssrcV6=(\S+)</regex>
+  <order>sonicwall.src_v6</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sdstV6=(\S+)</regex>
+  <order>sonicwall.dst_v6</order>
+</decoder>
+
+<!-- 7. Web filter and App Control. Category is a quoted string. -->
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sdstname=(\S+)</regex>
+  <order>sonicwall.dst_name</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sCategory="([^"]*)"</regex>
+  <order>sonicwall.cfs_category</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sappName="([^"]*)"</regex>
+  <order>sonicwall.app_name</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sappcat="([^"]*)"</regex>
+  <order>sonicwall.app_category</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sarg="([^"]*)"</regex>
+  <order>sonicwall.url_path</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sarg=([^"\s]\S*)</regex>
+  <order>sonicwall.url_path</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\scode=(\d+)</regex>
+  <order>sonicwall.code</order>
+</decoder>
+
+<!-- 8. Session teardown, verdict, VPN, IPS -->
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\ssent=(\d+)</regex>
+  <order>sonicwall.bytes_sent</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\srcvd=(\d+)</regex>
+  <order>sonicwall.bytes_rcvd</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sfw_action="([^"]*)"</regex>
+  <order>sonicwall.fw_action</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\ssess="([^"]*)"</regex>
+  <order>sonicwall.session_type</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sipscat="([^"]*)"</regex>
+  <order>sonicwall.ips_category</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sipspri=(\d+)</regex>
+  <order>sonicwall.ips_priority</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sif="([^"]*)"</regex>
+  <order>sonicwall.iface</order>
+</decoder>
+
+<decoder name="sonicwall-fields">
+  <parent>sonicwall</parent>
+  <regex type="pcre2">\sifName="([^"]*)"</regex>
+  <order>sonicwall.iface</order>
+</decoder>

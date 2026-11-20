@@ -1,0 +1,393 @@
+<!--
+  Companion rules for sysmon/sysmon_config.xml
+  ID range: 102300-102349
+  Parents: Wazuh 4.x built-in Sysmon rules (0595-win-sysmon_rules.xml)
+-->
+
+<group name="sysmon,sysmon_enhanced,windows,">
+
+  <!-- Event 10: LSASS access -->
+  <rule id="102300" level="13">
+    <if_sid>61612</if_sid>
+    <field name="win.eventdata.targetImage" type="pcre2">(?i)\\+lsass\.exe$</field>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)\\+(rundll32|powershell|pwsh|taskmgr|procdump64|procdump|sqldumper|createdump|rdrleakdiag|werfault)\.exe$</field>
+    <options>no_full_log</options>
+    <description>LSASS memory accessed by dump-capable binary $(win.eventdata.sourceImage) (access $(win.eventdata.grantedAccess)) on $(win.system.computer)</description>
+    <mitre><id>T1003.001</id></mitre>
+    <group>sysmon_cred_access,</group>
+  </rule>
+
+  <rule id="102301" level="12">
+    <if_sid>61612</if_sid>
+    <field name="win.eventdata.targetImage" type="pcre2">(?i)\\+lsass\.exe$</field>
+    <field name="win.eventdata.grantedAccess" type="pcre2">(?i)^0x(1410|1418|1438|143a|1f0fff|1f1fff|1f3fff|1fffff|40)$</field>
+    <field name="win.eventdata.sourceImage" type="pcre2" negate="yes">(?i)^[a-z]:\\+(windows\\+system32\\+(csrss|wininit|lsm|svchost|services|wbem\\+wmiprvse)\.exe|programdata\\+microsoft\\+windows defender\\+)</field>
+    <options>no_full_log</options>
+    <description>LSASS opened with credential-dump access mask $(win.eventdata.grantedAccess) by $(win.eventdata.sourceImage) on $(win.system.computer)</description>
+    <mitre><id>T1003.001</id></mitre>
+    <group>sysmon_cred_access,</group>
+  </rule>
+
+  <rule id="102302" level="10">
+    <if_sid>61612</if_sid>
+    <field name="win.eventdata.targetImage" type="pcre2">(?i)\\+lsass\.exe$</field>
+    <field name="win.eventdata.sourceImage" type="pcre2" negate="yes">(?i)^[a-z]:\\+(windows\\+(system32|syswow64)\\+|program files|programdata\\+microsoft\\+windows defender\\+)</field>
+    <options>no_full_log</options>
+    <description>LSASS accessed by process outside system and program paths: $(win.eventdata.sourceImage) on $(win.system.computer)</description>
+    <mitre><id>T1003.001</id></mitre>
+    <group>sysmon_cred_access,</group>
+  </rule>
+
+  <!-- Event 1: credential dumping -->
+  <rule id="102303" level="12">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)comsvcs(\.dll)?[\s,]+.*(minidump|#\+?24)</field>
+    <options>no_full_log</options>
+    <description>LSASS dump via comsvcs.dll MiniDump by $(win.eventdata.user) on $(win.system.computer)</description>
+    <mitre><id>T1003.001</id></mitre>
+    <group>sysmon_cred_access,</group>
+  </rule>
+
+  <rule id="102304" level="12">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.originalFileName" type="pcre2">(?i)^reg\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)\s(save|export)\s+(hklm|hkey_local_machine)\\+(sam|security|system)(\s|"|$)</field>
+    <options>no_full_log</options>
+    <description>Registry hive saved for offline credential extraction: $(win.eventdata.commandLine)</description>
+    <mitre><id>T1003.002</id></mitre>
+    <group>sysmon_cred_access,</group>
+  </rule>
+
+  <rule id="102305" level="12">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)\b(asktgt|asktgs|kerberoast|tgtdeleg|s4u)\b|/impersonateuser:</field>
+    <options>no_full_log</options>
+    <description>Kerberos ticket abuse tooling (Rubeus-style arguments) executed: $(win.eventdata.image)</description>
+    <mitre><id>T1558</id></mitre>
+    <group>sysmon_cred_access,</group>
+  </rule>
+
+  <!-- Event 1: exfiltration, tunneling, remote access -->
+  <rule id="102306" level="10">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\+(ngrok|cloudflared|chisel|frpc|plink|gost)\.exe$</field>
+    <options>no_full_log</options>
+    <description>Tunneling tool executed: $(win.eventdata.image) by $(win.eventdata.user)</description>
+    <mitre><id>T1572</id></mitre>
+  </rule>
+
+  <rule id="102307" level="10">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)trycloudflare\.com|\.ngrok\.io|ngrok-free\.app|tunnel\s+--url</field>
+    <options>no_full_log</options>
+    <description>Tunnel endpoint referenced on command line: $(win.eventdata.commandLine)</description>
+    <mitre><id>T1572</id></mitre>
+  </rule>
+
+  <rule id="102308" level="10">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\+(rclone|megacmdserver|megaclient|restic)\.exe$</field>
+    <options>no_full_log</options>
+    <description>Cloud sync/exfiltration tool executed: $(win.eventdata.image) by $(win.eventdata.user)</description>
+    <mitre><id>T1567.002</id></mitre>
+  </rule>
+
+  <rule id="102309" level="8">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\+(anydesk|screenconnect\.clientservice|screenconnect\.windowsclient|rustdesk|ateraagent|meshagent|srservice|tvnserver|winvnc|todesk|supremo)\.exe$</field>
+    <options>no_full_log</options>
+    <description>Remote access software started: $(win.eventdata.image) on $(win.system.computer)</description>
+    <mitre><id>T1219</id></mitre>
+  </rule>
+
+  <!-- Event 1: discovery and defense evasion -->
+  <rule id="102310" level="10">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\+(sharphound|adfind)\.exe$</field>
+    <options>no_full_log</options>
+    <description>Active Directory enumeration tool executed: $(win.eventdata.image)</description>
+    <mitre><id>T1087.002</id></mitre>
+  </rule>
+
+  <rule id="102311" level="10">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)--?collectionmethods?\b|invoke-bloodhound</field>
+    <options>no_full_log</options>
+    <description>BloodHound collection arguments on command line: $(win.eventdata.image)</description>
+    <mitre><id>T1087.002</id></mitre>
+  </rule>
+
+  <rule id="102312" level="8">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.originalFileName" type="pcre2">(?i)^(ldifde|csvde)\.exe$</field>
+    <options>no_full_log</options>
+    <description>Directory export utility executed: $(win.eventdata.commandLine)</description>
+    <mitre><id>T1087.002</id></mitre>
+  </rule>
+
+  <rule id="102313" level="10">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.originalFileName" type="pcre2">(?i)^cipher\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)/w:</field>
+    <options>no_full_log</options>
+    <description>Free-space wipe with cipher /w on $(win.system.computer)</description>
+    <mitre><id>T1070.004</id></mitre>
+  </rule>
+
+  <rule id="102314" level="8">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\+(powershell|pwsh|powershell_ise)\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)net\.webclient|downloadstring|downloadfile|downloaddata|invoke-webrequest|invoke-restmethod|start-bitstransfer|\biwr\s</field>
+    <options>no_full_log</options>
+    <description>PowerShell download cradle executed by $(win.eventdata.user)</description>
+    <mitre><id>T1105</id></mitre>
+  </rule>
+
+  <rule id="102315" level="10">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.originalFileName" type="pcre2">(?i)^netsh\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)portproxy\s+(add|set)</field>
+    <options>no_full_log</options>
+    <description>Port forwarding configured with netsh portproxy: $(win.eventdata.commandLine)</description>
+    <mitre><id>T1090</id></mitre>
+  </rule>
+
+  <rule id="102316" level="8">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.originalFileName" type="pcre2">(?i)^net1?\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)\s(user|localgroup|group)\s.+\s/add\b</field>
+    <options>no_full_log</options>
+    <description>Account or group membership added via net command: $(win.eventdata.commandLine)</description>
+    <mitre><id>T1136.001</id><id>T1098</id></mitre>
+  </rule>
+
+  <rule id="102317" level="12">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\+mpcmdrun\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)-removedefinitions</field>
+    <options>no_full_log</options>
+    <description>Microsoft Defender signatures removed via MpCmdRun on $(win.system.computer)</description>
+    <mitre><id>T1562.001</id></mitre>
+  </rule>
+
+  <rule id="102318" level="10">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\+mpcmdrun\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)-downloadfile</field>
+    <options>no_full_log</options>
+    <description>MpCmdRun used to download a file: $(win.eventdata.commandLine)</description>
+    <mitre><id>T1105</id></mitre>
+  </rule>
+
+  <rule id="102319" level="12">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\+(svchost|lsass|csrss|services|winlogon|smss|wininit|lsm)\.exe$</field>
+    <field name="win.eventdata.image" type="pcre2" negate="yes">(?i)^[a-z]:\\+windows\\+(system32|syswow64|winsxs)\\+</field>
+    <options>no_full_log</options>
+    <description>System process name running from non-system path: $(win.eventdata.image)</description>
+    <mitre><id>T1036.005</id></mitre>
+  </rule>
+
+  <!-- Events 12/13: registry persistence and tampering -->
+  <rule id="102320" level="10">
+    <if_sid>61614, 61615</if_sid>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\+(cor_profiler|coreclr_profiler|cor_enable_profiling)</field>
+    <options>no_full_log</options>
+    <description>.NET profiler registry hijack set by $(win.eventdata.image): $(win.eventdata.targetObject)</description>
+    <mitre><id>T1574.012</id></mitre>
+  </rule>
+
+  <rule id="102321" level="12">
+    <if_sid>61614, 61615</if_sid>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\+software\\+microsoft\\+amsi\\+providers</field>
+    <options>no_full_log</options>
+    <description>AMSI provider registration modified by $(win.eventdata.image)</description>
+    <mitre><id>T1562.001</id></mitre>
+  </rule>
+
+  <rule id="102322" level="10">
+    <if_sid>61614, 61615</if_sid>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\+environment\\+userinitmprlogonscript$</field>
+    <options>no_full_log</options>
+    <description>Logon script persistence via UserInitMprLogonScript: $(win.eventdata.details)</description>
+    <mitre><id>T1037.001</id></mitre>
+  </rule>
+
+  <rule id="102323" level="12">
+    <if_sid>61614, 61615</if_sid>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\+control\\+(lsa\\+(lsacfgflags|runasppl)$|deviceguard\\+)</field>
+    <options>no_full_log</options>
+    <description>LSA protection or Credential Guard setting changed by $(win.eventdata.image): $(win.eventdata.targetObject) = $(win.eventdata.details)</description>
+    <mitre><id>T1562.001</id></mitre>
+  </rule>
+
+  <rule id="102324" level="10">
+    <if_sid>61614, 61615</if_sid>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\+control\\+lsa\\+disablerestrictedadmin$</field>
+    <options>no_full_log</options>
+    <description>RDP Restricted Admin mode toggled (pass-the-hash over RDP) by $(win.eventdata.image)</description>
+    <mitre><id>T1550.002</id></mitre>
+  </rule>
+
+  <rule id="102325" level="10">
+    <if_sid>61614, 61615</if_sid>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\+winstations\\+rdp-tcp\\+portnumber$</field>
+    <options>no_full_log</options>
+    <description>RDP listening port changed to $(win.eventdata.details) by $(win.eventdata.image)</description>
+    <mitre><id>T1021.001</id></mitre>
+  </rule>
+
+  <rule id="102326" level="10">
+    <if_sid>61614, 61615</if_sid>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\+policies\\+system\\+(consentpromptbehavioradmin|enablelua)$</field>
+    <options>no_full_log</options>
+    <description>UAC setting changed by $(win.eventdata.image): $(win.eventdata.targetObject) = $(win.eventdata.details)</description>
+    <mitre><id>T1548.002</id></mitre>
+  </rule>
+
+  <rule id="102327" level="12">
+    <if_sid>61614, 61615</if_sid>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\+classes\\+(folder|ms-settings|mscfile|exefile)\\+shell\\+open\\+command</field>
+    <options>no_full_log</options>
+    <description>Shell open-command handler hijacked (UAC bypass) by $(win.eventdata.image): $(win.eventdata.details)</description>
+    <mitre><id>T1548.002</id></mitre>
+  </rule>
+
+  <rule id="102328" level="8">
+    <if_sid>61614, 61615</if_sid>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\+explorer\\+user shell folders\\+(common )?startup$</field>
+    <options>no_full_log</options>
+    <description>Startup folder location redirected to $(win.eventdata.details) by $(win.eventdata.image)</description>
+    <mitre><id>T1547.001</id></mitre>
+  </rule>
+
+  <rule id="102329" level="12">
+    <if_sid>61614, 61615</if_sid>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\+windows defender\\+exclusions\\+(paths|extensions|processes|ipaddresses)\\+</field>
+    <options>no_full_log</options>
+    <description>Microsoft Defender exclusion added by $(win.eventdata.image): $(win.eventdata.targetObject)</description>
+    <mitre><id>T1562.001</id></mitre>
+  </rule>
+
+  <!-- Event 6: drivers -->
+  <rule id="102330" level="12">
+    <if_sid>61608</if_sid>
+    <field name="win.eventdata.signed" type="pcre2">(?i)^false$</field>
+    <options>no_full_log</options>
+    <description>Unsigned kernel driver loaded: $(win.eventdata.imageLoaded)</description>
+    <mitre><id>T1014</id><id>T1068</id></mitre>
+  </rule>
+
+  <rule id="102331" level="10">
+    <if_sid>61608</if_sid>
+    <field name="win.eventdata.signatureStatus" type="pcre2" negate="yes">(?i)^valid$</field>
+    <options>no_full_log</options>
+    <description>Kernel driver loaded with invalid signature ($(win.eventdata.signatureStatus)): $(win.eventdata.imageLoaded)</description>
+    <mitre><id>T1014</id><id>T1068</id></mitre>
+  </rule>
+
+  <!-- Event 8: injection -->
+  <rule id="102332" level="13">
+    <if_sid>61610</if_sid>
+    <field name="win.eventdata.targetImage" type="pcre2">(?i)\\+(lsass|winlogon|csrss)\.exe$</field>
+    <options>no_full_log</options>
+    <description>Remote thread created in $(win.eventdata.targetImage) by $(win.eventdata.sourceImage)</description>
+    <mitre><id>T1055</id></mitre>
+  </rule>
+
+  <rule id="102333" level="12">
+    <if_sid>61610</if_sid>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)\\+(users\\+(public|[^\\]+\\+(appdata|downloads|desktop))|programdata|windows\\+temp|perflogs)\\+</field>
+    <options>no_full_log</options>
+    <description>Remote thread injected from user-writable path: $(win.eventdata.sourceImage) into $(win.eventdata.targetImage)</description>
+    <mitre><id>T1055</id></mitre>
+  </rule>
+
+  <!-- Event 9, 25, 26 -->
+  <rule id="102334" level="12">
+    <if_sid>61611</if_sid>
+    <options>no_full_log</options>
+    <description>Raw disk read by non-system process $(win.eventdata.image) on $(win.eventdata.device)</description>
+    <mitre><id>T1006</id></mitre>
+    <group>sysmon_cred_access,</group>
+  </rule>
+
+  <rule id="102335" level="10">
+    <if_sid>61653</if_sid>
+    <options>no_full_log</options>
+    <description>Process tampering ($(win.eventdata.type)) detected in $(win.eventdata.image)</description>
+    <mitre><id>T1055.012</id></mitre>
+  </rule>
+
+  <rule id="102336" level="12">
+    <if_sid>61654</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\+system32\\+winevt\\+logs\\+.+\.evtx$</field>
+    <options>no_full_log</options>
+    <description>Event log file deleted by $(win.eventdata.image): $(win.eventdata.targetFilename)</description>
+    <mitre><id>T1070.001</id></mitre>
+  </rule>
+
+  <!-- Events 17/18: named pipes -->
+  <rule id="102337" level="12">
+    <if_sid>61645, 61646</if_sid>
+    <field name="win.eventdata.pipeName" type="pcre2">(?i)^\\+(msse-\d+-server|msagent_|postex_|status_\d|mojo\.5688\.8052|interprocess_\d|lsadump|cachedump|wceservicepipe|gruntsvc|msf-pipe|remcom|paexec|csexec)</field>
+    <options>no_full_log</options>
+    <description>Named pipe associated with offensive tooling: $(win.eventdata.pipeName) by $(win.eventdata.image)</description>
+    <mitre><id>T1570</id><id>T1055</id></mitre>
+  </rule>
+
+  <rule id="102338" level="8">
+    <if_sid>61645, 61646</if_sid>
+    <field name="win.eventdata.pipeName" type="pcre2">(?i)^\\+pshost</field>
+    <field name="win.eventdata.image" type="pcre2" negate="yes">(?i)\\+(powershell|powershell_ise|pwsh|wsmprovhost)\.exe$</field>
+    <options>no_full_log</options>
+    <description>PowerShell runspace hosted by non-PowerShell process (unmanaged PowerShell): $(win.eventdata.image)</description>
+    <mitre><id>T1059.001</id></mitre>
+  </rule>
+
+  <!-- Events 19-21: WMI persistence -->
+  <rule id="102339" level="12">
+    <if_sid>61648</if_sid>
+    <field name="win.eventdata.type" type="pcre2">(?i)command line|script</field>
+    <options>no_full_log</options>
+    <description>WMI $(win.eventdata.type) event consumer created: $(win.eventdata.destination)</description>
+    <mitre><id>T1546.003</id></mitre>
+  </rule>
+
+  <!-- Event 11 and 29: payload delivery -->
+  <rule id="102340" level="8">
+    <if_sid>61613</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\+(downloads|appdata\\+local\\+temp|inetcache\\+content\.outlook)\\+.+\.vhdx?$</field>
+    <options>no_full_log</options>
+    <description>Virtual disk container written to download/temp location: $(win.eventdata.targetFilename)</description>
+    <mitre><id>T1553.005</id></mitre>
+  </rule>
+
+  <rule id="102341" level="10">
+    <if_sid>61600</if_sid>
+    <field name="win.system.eventID">^29$</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\+(certutil|bitsadmin|curl|mshta|regsvr32|rundll32|wmic|cscript|wscript|hh|msbuild|installutil|desktopimgdownldr|expand|extrac32)\.exe$</field>
+    <options>no_full_log</options>
+    <description>Executable written by system utility $(win.eventdata.image): $(win.eventdata.targetFilename)</description>
+    <mitre><id>T1105</id></mitre>
+  </rule>
+
+  <!-- Event 3: tunneling/RMM network activity -->
+  <rule id="102342" level="10">
+    <if_sid>61605</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\+(rclone|ngrok|cloudflared|chisel|frpc|plink)\.exe$</field>
+    <options>no_full_log</options>
+    <description>Tunneling/exfiltration tool connected to $(win.eventdata.destinationIp):$(win.eventdata.destinationPort): $(win.eventdata.image)</description>
+    <mitre><id>T1572</id><id>T1567.002</id></mitre>
+  </rule>
+
+  <!-- Correlation -->
+  <rule id="102349" level="14" frequency="2" timeframe="900">
+    <if_matched_group>sysmon_cred_access</if_matched_group>
+    <same_field>win.system.computer</same_field>
+    <options>no_full_log</options>
+    <description>Multiple credential-access indicators on $(win.system.computer) within 15 minutes</description>
+    <mitre><id>T1003</id></mitre>
+  </rule>
+
+</group>

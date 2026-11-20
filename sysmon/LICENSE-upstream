@@ -1,0 +1,49 @@
+MIT License
+
+================================================================================
+                    SYSMON CONFIGURATION FOR WAZUH SIEM
+                      GOLINE - Cybersecurity Solution
+================================================================================
+
+Copyright (c) 2025 Paolo Kappa (Paolo Caparrelli)
+Company: GOLINE SA - Cybersecurity & SIEM Solutions
+Website: https://www.goline.ch
+Project: Advanced Sysmon Configuration for Enterprise Security Monitoring
+
+================================================================================
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+                              ADDITIONAL NOTES
+================================================================================
+
+This Sysmon configuration is designed specifically for enterprise environments
+and integrates with Wazuh SIEM for comprehensive security monitoring. The 
+configuration includes detection rules based on the MITRE ATT&CK framework
+and has been optimized for production environments.
+
+DISCLAIMER: This configuration is provided for educational and professional
+security monitoring purposes. Users are responsible for compliance with all
+applicable laws and regulations in their jurisdiction.
+
+For professional cybersecurity services and custom SIEM implementations,
+contact GOLINE SA at: https://www.goline.ch
+
+================================================================================
