@@ -8,7 +8,7 @@ Sysmon configuration and Wazuh rules for Windows endpoint detection, maintained 
 |------|------------|
 | `sysmon/sysmon_config.xml` | Sysmon configuration (schema 4.90, Sysmon 15+) tuned for Wazuh |
 | `rules/0910-sysmon_enhanced_rules.xml` | Wazuh rules for the detections the Sysmon config enables (IDs 102300–102349) |
-| `rules/0920-windows_auth_correlation_rules.xml` | Successful Windows logon after repeated failures from the same source (ID 119110) |
+| `rules/0920-windows_auth_correlation_rules.xml` | Successful Windows logon after repeated failures from the same source, escalated for RDP and elevated logons (IDs 119110–119112) |
 | `rules/0415-sophos_central_rules.xml` | Sophos Central (API/JSON) rules, replacing the stock on-prem Sophos ruleset |
 | `decoders/0295-sonicwall_decoders_override.xml` | Full replacement for the stock SonicWall decoder, extracting 37 `sonicwall.*` fields the compiled plugin drops |
 

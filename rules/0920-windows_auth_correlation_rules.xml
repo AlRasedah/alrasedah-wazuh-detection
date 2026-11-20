@@ -10,10 +10,34 @@
     <if_matched_sid>60204</if_matched_sid>
     <same_field>win.eventdata.ipAddress</same_field>
     <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2" negate="yes">^(-|::1|127\.0\.0\.1)?$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2" negate="yes">(?i)^anonymous logon$|\$$</field>
     <description>Windows logon succeeded for $(win.eventdata.targetUserName) from $(win.eventdata.ipAddress) after multiple logon failures from the same source - possible successful brute force</description>
     <mitre>
       <id>T1110</id>
       <id>T1078</id>
+    </mitre>
+    <group>pci_dss_10.2.4,pci_dss_10.2.5,gdpr_IV_35.7.d,nist_800_53_AC.7,</group>
+  </rule>
+
+  <rule id="119111" level="15">
+    <if_sid>119110</if_sid>
+    <field name="win.eventdata.logonType">^10$</field>
+    <description>RDP logon succeeded for $(win.eventdata.targetUserName) from $(win.eventdata.ipAddress) after multiple logon failures from the same source - likely successful RDP brute force</description>
+    <mitre>
+      <id>T1110</id>
+      <id>T1021.001</id>
+    </mitre>
+    <group>pci_dss_10.2.4,pci_dss_10.2.5,gdpr_IV_35.7.d,nist_800_53_AC.7,</group>
+  </rule>
+
+  <rule id="119112" level="15">
+    <if_sid>119110</if_sid>
+    <field name="win.eventdata.elevatedToken" type="pcre2">^%%1842$</field>
+    <description>Elevated (admin) logon succeeded for $(win.eventdata.targetUserName) from $(win.eventdata.ipAddress) after multiple logon failures from the same source - likely successful brute force of a privileged account</description>
+    <mitre>
+      <id>T1110</id>
+      <id>T1078.002</id>
     </mitre>
     <group>pci_dss_10.2.4,pci_dss_10.2.5,gdpr_IV_35.7.d,nist_800_53_AC.7,</group>
   </rule>
