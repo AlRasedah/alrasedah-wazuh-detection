@@ -1,0 +1,21 @@
+<!--
+  Windows authentication correlation rules
+  ID range: 119110-119119
+-->
+
+<group name="local,windows,authentication_success,brute_force,">
+
+  <rule id="119110" level="14" timeframe="600">
+    <if_group>authentication_success</if_group>
+    <if_matched_sid>60204</if_matched_sid>
+    <same_field>win.eventdata.ipAddress</same_field>
+    <field name="win.system.eventID">^4624$</field>
+    <description>Windows logon succeeded for $(win.eventdata.targetUserName) from $(win.eventdata.ipAddress) after multiple logon failures from the same source - possible successful brute force</description>
+    <mitre>
+      <id>T1110</id>
+      <id>T1078</id>
+    </mitre>
+    <group>pci_dss_10.2.4,pci_dss_10.2.5,gdpr_IV_35.7.d,nist_800_53_AC.7,</group>
+  </rule>
+
+</group>
